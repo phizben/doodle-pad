@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#FFE9B8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Doodle Pad">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>Doodle Pad</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&display=swap">
+<style>
+/* Layout: one-screen app — slim top bar, paper canvas in the middle, chunky crayon dock at the bottom. Single bright look, no dark theme (a paper sheet stays white). */
+:root{
+  --desk:#FFE9B8;      /* warm crayon-box yellow */
+  --paper:#FFFFFF;
+  --ink:#2B2340;       /* deep plum for text and outlines */
+  --dock:#FFF7E3;
+  --pop:#FF5C8A;       /* bubblegum for active states */
+  --line:#E8C97E;
+  --font-display:"Baloo 2", "Comic Sans MS", "Chalkboard SE", system-ui, sans-serif;
+  color-scheme:light;
+}
+html{height:100%;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);overscroll-behavior:none}
+body{height:100%;margin:0;overscroll-behavior:none}
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
+body{
+  background:var(--desk);color:var(--ink);font-family:var(--font-display);
+  display:flex;flex-direction:column;overflow:hidden;
+  padding-left:max(12px, env(safe-area-inset-left,0px));
+  padding-right:max(12px, env(safe-area-inset-right,0px));
+  padding-block:10px;gap:10px;box-sizing:border-box;
+  -webkit-user-select:none;user-select:none;touch-action:none;
+}
+@media (min-width:500px){body{padding-left:max(16px, env(safe-area-inset-left,0px));padding-right:max(16px, env(safe-area-inset-right,0px))}}
+button{font-family:inherit;color:var(--ink);cursor:pointer;-webkit-tap-highlight-color:transparent}
+button:focus-visible{outline:3px solid var(--pop);outline-offset:2px}
+
+.top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.top h1{margin:0;font-size:1.6rem;font-weight:800;line-height:1;letter-spacing:.5px;flex:1;min-width:0}
+.top h1 span{display:inline-block}
+.pill{
+  border:3px solid var(--ink);background:var(--paper);border-radius:999px;
+  padding:6px 16px;font-size:1.05rem;font-weight:800;box-shadow:0 3px 0 var(--ink);
+  transition:transform .08s;
+}
+.pill:active{transform:translateY(3px);box-shadow:0 0 0 var(--ink)}
+.pill:disabled{opacity:.4;cursor:default}
+.pill.save{background:#C9F2C2}
+.pill.danger{background:#FFD3DF}
+.pill.sure{background:var(--pop);color:#fff}
+
+.stage{flex:1;min-height:0;position:relative;border:4px solid var(--ink);border-radius:22px;background:var(--paper);overflow:hidden;box-shadow:0 6px 0 var(--ink)}
+canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:crosshair}
+.hint{position:absolute;inset:0;display:grid;place-items:center;font-size:clamp(1.6rem,6vw,3rem);font-weight:800;color:#D9CFE8;pointer-events:none;transition:opacity .3s}
+
+.dock{background:var(--dock);border:4px solid var(--ink);border-radius:22px;padding:10px;display:flex;flex-direction:column;gap:10px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:center}
+.sw{
+  width:44px;height:44px;border-radius:50%;border:3px solid var(--ink);padding:0;
+  transition:transform .12s;
+}
+.sw.on{transform:scale(1.18);box-shadow:0 0 0 4px var(--dock),0 0 0 7px var(--pop)}
+.sw.rainbow{background:conic-gradient(#ff4d4d,#ffa94d,#ffe14d,#5ad15a,#4dc3ff,#7a5cff,#ff4dd2,#ff4d4d)}
+.tool{
+  min-width:52px;height:52px;border-radius:16px;border:3px solid var(--ink);background:var(--paper);
+  display:grid;place-items:center;padding:0 8px;box-shadow:0 3px 0 var(--ink);
+}
+.tool svg{width:30px;height:30px}
+.tool.on{background:var(--pop);color:#fff}
+.tool.on svg *{stroke:#fff}
+.tool.on svg .fillme{fill:#fff}
+.sep{width:3px;height:40px;background:var(--line);border-radius:3px}
+.size{width:52px;height:52px;border-radius:16px;border:3px solid var(--ink);background:var(--paper);display:grid;place-items:center;padding:0;box-shadow:0 3px 0 var(--ink)}
+.size i{display:block;border-radius:50%;background:var(--ink)}
+.size.on{background:var(--pop)}
+.size.on i{background:#fff}
+.tray{background:var(--paper);border:3px dashed var(--line);border-radius:18px;padding:8px}
+.stk{width:50px;height:50px;font-size:32px;line-height:1;border-radius:14px;border:3px solid transparent;background:transparent;padding:0;transition:transform .12s;font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif}
+.stk:hover{transform:scale(1.12)}
+.stk.on{border-color:var(--pop);background:#FFE3EC;transform:scale(1.12)}
+.toggle{min-width:52px;height:52px;border-radius:16px;border:3px solid var(--ink);background:var(--paper);display:grid;place-items:center;padding:0 8px;box-shadow:0 3px 0 var(--ink)}
+.toggle svg{width:30px;height:30px}
+.toggle.on{background:#7FE0D6}
+@media (max-width:520px){
+  .stk{width:42px;height:42px;font-size:27px}
+  .toggle{min-width:44px;height:44px}
+  .toggle svg{width:24px;height:24px}
+  .sw{width:36px;height:36px}
+  .tool,.size{min-width:44px;width:auto;height:44px}
+  .size{width:44px}
+  .tool svg{width:24px;height:24px}
+  .sep{display:none}
+  .top h1{font-size:1.3rem}
+  .pill{padding:4px 12px;font-size:.95rem}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="top">
+  <h1 id="title"></h1>
+  <button class="pill" id="undo" disabled>Undo</button>
+  <button class="pill save" id="save">Save</button>
+  <button class="pill danger" id="clear">New page</button>
+</div>
+
+<div class="stage" id="stage">
+  <canvas id="c"></canvas>
+  <div class="hint" id="hint">Draw here!</div>
+</div>
+
+<div class="dock">
+  <div class="row" id="colors"></div>
+  <div class="row tray" id="tray" hidden></div>
+  <div class="row">
+    <button class="tool on" data-tool="brush" title="Brush" aria-label="Brush">
+      <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M22 4l6 6-12 12-6-6z"/><path d="M10 16c-4 0-6 3-6 6s-1 5-2 6c5 0 12-1 12-8"/></svg>
+    </button>
+    <button class="tool" data-tool="glitter" title="Glitter" aria-label="Glitter brush">
+      <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"><path class="fillme" d="M13 3l2.5 7.5L23 13l-7.5 2.5L13 23l-2.5-7.5L3 13l7.5-2.5z"/><path class="fillme" d="M24 19l1.3 3.7L29 24l-3.7 1.3L24 29l-1.3-3.7L19 24l3.7-1.3z"/></svg>
+    </button>
+    <button class="tool" data-tool="sticker" title="Stickers" aria-label="Stickers">
+      <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M28 17A12 12 0 1115 4h4l9 9z"/><path d="M19 4v6a3 3 0 003 3h6"/><circle class="fillme" cx="11" cy="15" r="1.2"/><circle class="fillme" cx="18" cy="17" r="1.2"/><path d="M10 21c2 2.5 6 2.5 8 0"/></svg>
+    </button>
+    <button class="tool" data-tool="fill" title="Paint bucket" aria-label="Paint bucket">
+      <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 14l10-10 10 10-10 10z"/><path d="M27 20c0 0-3 4-3 6a3 3 0 006 0c0-2-3-6-3-6z"/></svg>
+    </button>
+    <button class="tool" data-tool="star" title="Star stamp" aria-label="Star stamp">
+      <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"><path class="fillme" d="M16 3l3.9 8.2 8.9 1.1-6.6 6.1 1.7 8.9L16 23l-7.9 4.3 1.7-8.9-6.6-6.1 8.9-1.1z"/></svg>
+    </button>
+    <button class="tool" data-tool="heart" title="Heart stamp" aria-label="Heart stamp">
+      <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"><path d="M16 28S3 20 3 11.5A6.5 6.5 0 0116 8a6.5 6.5 0 0113 3.5C29 20 16 28 16 28z"/></svg>
+    </button>
+    <button class="tool" data-tool="eraser" title="Eraser" aria-label="Eraser">
+      <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 5l9 9-12 12H9l-5-5z"/><path d="M11 12l9 9"/><path d="M15 26h13"/></svg>
+    </button>
+    <span class="sep"></span>
+    <button class="size" data-size="6" aria-label="Thin"><i style="width:8px;height:8px"></i></button>
+    <button class="size on" data-size="16" aria-label="Medium"><i style="width:16px;height:16px"></i></button>
+    <button class="size" data-size="34" aria-label="Thick"><i style="width:26px;height:26px"></i></button>
+    <span class="sep"></span>
+    <button class="toggle" id="mirror" title="Mirror magic" aria-label="Mirror magic" aria-pressed="false">
+      <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3v26" stroke-dasharray="3 3"/><path d="M12 9L4 16l8 7z"/><path d="M20 9l8 7-8 7z"/></svg>
+    </button>
+  </div>
+</div>
+
+<script>
+(() => {
+  // Bouncy rainbow title
+  const t = document.getElementById('title');
+  const letterColors = ['#FF4D4D','#FF9F1C','#2EC4B6','#3A86FF','#8338EC','#FF5C8A'];
+  [...'Doodle Pad'].forEach((ch,i)=>{const s=document.createElement('span');s.textContent=ch===' '?' ':ch;s.style.color=letterColors[i%letterColors.length];t.appendChild(s)});
+
+  const COLORS = ['#2B2340','#FF4D4D','#FF9F1C','#FFD60A','#5AD15A','#2EC4B6','#3A86FF','#8338EC','#FF5CBE','#8B5A2B','#FFFFFF','rainbow'];
+  const colorsEl = document.getElementById('colors');
+  let color = '#FF4D4D', tool='brush', size=16, hue=0;
+
+  COLORS.forEach(c=>{
+    const b=document.createElement('button');
+    b.className='sw'+(c==='rainbow'?' rainbow':'')+(c===color?' on':'');
+    if(c!=='rainbow') b.style.background=c;
+    b.setAttribute('aria-label', c==='rainbow'?'Rainbow':'Color '+c);
+    b.onclick=()=>{color=c;[...colorsEl.children].forEach(x=>x.classList.toggle('on',x===b)); if(tool==='eraser') setTool('brush');};
+    colorsEl.appendChild(b);
+  });
+
+  const tools=[...document.querySelectorAll('[data-tool]')];
+  const tray=document.getElementById('tray');
+  const STICKERS=['🧜‍♀️','🧚‍♀️','🦄','🐬','🐠','🐙','🐚','🦀','🐳','🌈','👑','🦋','🌸','🌻','🐱','🐶','🐰','🍓','🍦','🧁','🎈','💖','⭐','✨'];
+  let sticker=STICKERS[0];
+  STICKERS.forEach((s,i)=>{
+    const b=document.createElement('button');b.className='stk'+(i===0?' on':'');b.textContent=s;b.setAttribute('aria-label','Sticker '+s);
+    b.onclick=()=>{sticker=s;[...tray.children].forEach(x=>x.classList.toggle('on',x===b));setTool('sticker')};
+    tray.appendChild(b);
+  });
+  function setTool(n){tool=n;tools.forEach(b=>b.classList.toggle('on',b.dataset.tool===n));tray.hidden=n!=='sticker'}
+  let mirror=false;const mirrorBtn=document.getElementById('mirror');
+  mirrorBtn.onclick=()=>{mirror=!mirror;mirrorBtn.classList.toggle('on',mirror);mirrorBtn.setAttribute('aria-pressed',mirror)};
+  tools.forEach(b=>b.onclick=()=>setTool(b.dataset.tool));
+  const sizes=[...document.querySelectorAll('[data-size]')];
+  sizes.forEach(b=>b.onclick=()=>{size=+b.dataset.size;sizes.forEach(x=>x.classList.toggle('on',x===b))});
+
+  // Canvas
+  const stage=document.getElementById('stage'), cv=document.getElementById('c'), ctx=cv.getContext('2d',{willReadFrequently:true});
+  const hint=document.getElementById('hint');
+  let dpr=1;
+  function resize(){
+    const r=stage.getBoundingClientRect();
+    dpr=Math.min(window.devicePixelRatio||1,2);
+    const w=Math.max(1,Math.round(r.width*dpr)), h=Math.max(1,Math.round(r.height*dpr));
+    if(w===cv.width&&h===cv.height) return;
+    const old=document.createElement('canvas');old.width=cv.width;old.height=cv.height;
+    if(cv.width) old.getContext('2d').drawImage(cv,0,0);
+    cv.width=w;cv.height=h;
+    ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);
+    if(old.width) ctx.drawImage(old,0,0);
+  }
+  new ResizeObserver(resize).observe(stage); resize();
+
+  // Undo
+  const hist=[]; const undoBtn=document.getElementById('undo');
+  function snap(){hist.push(ctx.getImageData(0,0,cv.width,cv.height)); if(hist.length>25) hist.shift(); undoBtn.disabled=false}
+  undoBtn.onclick=()=>{const d=hist.pop(); if(d){ if(d.width!==cv.width||d.height!==cv.height){ctx.fillStyle='#fff';ctx.fillRect(0,0,cv.width,cv.height);} ctx.putImageData(d,0,0);} undoBtn.disabled=!hist.length};
+
+  const pos=e=>{const r=cv.getBoundingClientRect();return{x:(e.clientX-r.left)*dpr,y:(e.clientY-r.top)*dpr}};
+  const strokeColor=()=>{ if(tool==='eraser') return '#fff'; if(color==='rainbow'){hue=(hue+4)%360;return `hsl(${hue} 90% 55%)`} return color };
+
+  let drawing=false,last=null,lastStamp=null;
+  function line(a,b){
+    ctx.strokeStyle=strokeColor();ctx.lineWidth=(tool==='eraser'?size*2:size)*dpr;
+    ctx.lineCap='round';ctx.lineJoin='round';
+    ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
+  }
+  function stamp(p){
+    const s=(size*1.6+14)*dpr, c=color==='rainbow'?`hsl(${(hue=(hue+40)%360)} 90% 58%)`:color;
+    ctx.save();ctx.translate(p.x,p.y);ctx.fillStyle=c;ctx.strokeStyle='#2B2340';ctx.lineWidth=Math.max(2,s*.08);ctx.lineJoin='round';
+    ctx.rotate((Math.random()-.5)*.5);
+    ctx.beginPath();
+    if(tool==='star'){for(let i=0;i<10;i++){const r=i%2?s*.45:s;const a=-Math.PI/2+i*Math.PI/5;ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r)}ctx.closePath()}
+    else{ctx.moveTo(0,s*.9);ctx.bezierCurveTo(-s*1.3,0,-s*.7,-s*1.1,0,-s*.4);ctx.bezierCurveTo(s*.7,-s*1.1,s*1.3,0,0,s*.9)}
+    ctx.fill();ctx.stroke();ctx.restore();
+  }
+  function hexToRgb(c){
+    if(color==='rainbow'){hue=(hue+50)%360;const t=document.createElement('canvas').getContext('2d');t.fillStyle=`hsl(${hue} 90% 60%)`;t.fillRect(0,0,1,1);return [...t.getImageData(0,0,1,1).data]}
+    const n=parseInt(c.slice(1),16);return[(n>>16)&255,(n>>8)&255,n&255,255]
+  }
+  function fill(p){
+    const W=cv.width,H=cv.height,x0=Math.floor(p.x),y0=Math.floor(p.y);
+    const img=ctx.getImageData(0,0,W,H),d=img.data,i0=(y0*W+x0)*4;
+    const tr=d[i0],tg=d[i0+1],tb=d[i0+2];const [r,g,b]=hexToRgb(color);
+    if(Math.abs(tr-r)+Math.abs(tg-g)+Math.abs(tb-b)<10) return;
+    const tol=90, same=i=>Math.abs(d[i]-tr)+Math.abs(d[i+1]-tg)+Math.abs(d[i+2]-tb)<=tol;
+    const seen=new Uint8Array(W*H), stack=[x0,y0];
+    while(stack.length){
+      let y=stack.pop(),x=stack.pop(),idx=y*W+x;
+      while(x>=0&&!seen[idx]&&same(idx*4)){x--;idx--}
+      x++;idx++;let up=false,dn=false;
+      while(x<W&&!seen[idx]&&same(idx*4)){
+        seen[idx]=1;const k=idx*4;d[k]=r;d[k+1]=g;d[k+2]=b;d[k+3]=255;
+        if(y>0){const u=idx-W;if(!seen[u]&&same(u*4)){if(!up){stack.push(x,y-1);up=true}}else up=false}
+        if(y<H-1){const v=idx+W;if(!seen[v]&&same(v*4)){if(!dn){stack.push(x,y+1);dn=true}}else dn=false}
+        x++;idx++;
+      }
+    }
+    // soften the edge by growing the fill 1px into anti-aliased outline pixels
+    ctx.putImageData(img,0,0);
+  }
+
+  function putSticker(p){
+    const s=(size*2.2+44)*dpr;
+    ctx.save();ctx.translate(p.x,p.y);ctx.rotate((Math.random()-.5)*.4);
+    ctx.font=`${s}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`;
+    ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#000';
+    ctx.fillText(sticker,0,0);ctx.restore();
+  }
+  function sparkle(x,y,r,c){
+    ctx.fillStyle=c;ctx.beginPath();
+    ctx.moveTo(x,y-r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.quadraticCurveTo(x,y,x,y+r);ctx.quadraticCurveTo(x,y,x-r,y);ctx.quadraticCurveTo(x,y,x,y-r);ctx.fill();
+  }
+  function glitter(a,b){
+    const spread=(size*1.2+8)*dpr, steps=Math.max(1,Math.ceil(Math.hypot(b.x-a.x,b.y-a.y)/(4*dpr)));
+    for(let s=0;s<steps;s++){
+      const t=s/steps,cx=a.x+(b.x-a.x)*t,cy=a.y+(b.y-a.y)*t;
+      for(let k=0;k<3;k++){
+        const ang=Math.random()*Math.PI*2,d=Math.random()*spread,x=cx+Math.cos(ang)*d,y=cy+Math.sin(ang)*d;
+        const roll=Math.random();
+        let c=color==='rainbow'?`hsl(${Math.random()*360} 90% 60%)`:color;
+        if(roll<.18) c=['#FFFFFF','#FFE066','#FFD1F0'][Math.floor(Math.random()*3)];
+        if(Math.random()<.12) sparkle(x,y,(2+Math.random()*5)*dpr,c);
+        else{ctx.fillStyle=c;ctx.beginPath();ctx.arc(x,y,(0.8+Math.random()*1.8)*dpr,0,7);ctx.fill()}
+      }
+    }
+  }
+  const flip=p=>({x:cv.width-p.x,y:p.y});
+  const both=(fn,...pts)=>{fn(...pts);if(mirror)fn(...pts.map(flip))};
+  const isStamp=()=>tool==='star'||tool==='heart'||tool==='sticker';
+  const doStamp=p=>tool==='sticker'?putSticker(p):stamp(p);
+
+  cv.addEventListener('pointerdown',e=>{
+    e.preventDefault();cv.setPointerCapture(e.pointerId);
+    hint.style.opacity=0;snap();const p=pos(e);
+    if(tool==='fill'){fill(p);return}
+    if(isStamp()){both(doStamp,p);lastStamp=p;drawing=true;return}
+    drawing=true;last=p;
+    if(tool==='glitter') both(glitter,p,p); else both(line,p,{x:p.x+.01,y:p.y});
+  });
+  cv.addEventListener('pointermove',e=>{
+    if(!drawing) return;const p=pos(e);
+    if(isStamp()){const gap=(size*3+(tool==='sticker'?70:40))*dpr;if(Math.hypot(p.x-lastStamp.x,p.y-lastStamp.y)>gap){both(doStamp,p);lastStamp=p}return}
+    both(tool==='glitter'?glitter:line,last,p);last=p;
+  });
+  const end=()=>{drawing=false;last=null};
+  cv.addEventListener('pointerup',end);cv.addEventListener('pointercancel',end);
+
+  // New page with a two-tap confirm
+  const clearBtn=document.getElementById('clear');let armed=null;
+  clearBtn.onclick=()=>{
+    if(!armed){clearBtn.textContent='Sure?';clearBtn.classList.add('sure');armed=setTimeout(()=>{armed=null;clearBtn.textContent='New page';clearBtn.classList.remove('sure')},2500);return}
+    clearTimeout(armed);armed=null;clearBtn.textContent='New page';clearBtn.classList.remove('sure');
+    snap();ctx.fillStyle='#fff';ctx.fillRect(0,0,cv.width,cv.height);hint.style.opacity=1;
+  };
+
+  // Save the drawing: share sheet on phones (Save Image -> Photos), download elsewhere
+  document.getElementById('save').onclick=()=>{
+    cv.toBlob(async blob=>{
+      const name='doodle-'+new Date().toISOString().slice(0,16).replace(/[:T]/g,'-')+'.png';
+      const file=new File([blob],name,{type:'image/png'});
+      try{ if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:'My drawing'});return} }catch(e){ if(e.name==='AbortError') return }
+      const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();
+      setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+    },'image/png');
+  };
+})();
+if('serviceWorker' in navigator){addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))}
+</script>
+</body>
+</html>
